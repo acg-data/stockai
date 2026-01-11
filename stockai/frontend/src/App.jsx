@@ -1,9 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import {
   Search, Bell, User, Layout, Filter, Sparkles,
   Send, ArrowRight, ChevronDown, TrendingUp, Activity, Sun, Moon, ChevronUp
 } from 'lucide-react';
-import ScreenerPage from './pages/ScreenerPage';
+import ErrorBoundary from './components/ErrorBoundary';
+import ConvexWrapper from './components/ConvexWrapper';
+import DummyScreener from './pages/DummyScreener';
+
+// Lazy load Convex-dependent pages with error handling
+const ScreenerPage = lazy(() => 
+  import('./pages/ScreenerPage').catch(() => ({
+    default: () => null
+  }))
+);
+const ConvexTest = lazy(() =>
+  import('./pages/ConvexTest').catch(() => ({
+    default: () => null
+  }))
+);
 
 // --- MOCK DATA ---
 const STOCK_DATA = [
@@ -44,9 +58,11 @@ const Header = ({ isDark, toggleTheme, currentPage, setCurrentPage }) => (
         {[
           { name: 'Dashboard', page: 'dashboard' },
           { name: 'Screener', page: 'screener' },
+          { name: 'Dummy Screener', page: 'dummy-screener' },
           { name: 'Maps', page: 'maps' },
           { name: 'Portfolio', page: 'portfolio' },
-          { name: 'Insider', page: 'insider' }
+          { name: 'Insider', page: 'insider' },
+          { name: 'Convex Test', page: 'convex-test' }
         ].map((item) => (
           <button
             key={item.name}
@@ -411,7 +427,64 @@ const App = () => {
       />
 
       {currentPage === 'screener' ? (
-        <ScreenerPage />
+        <ErrorBoundary
+          isDark={isDark}
+          message="The Convex-based Screener page could not be loaded. Please try the Screener."
+          fallback={() => (
+            <div className={`h-full flex items-center justify-center ${
+              isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'
+            }`}>
+              <div className={`max-w-md p-8 rounded-2xl shadow-xl text-center ${
+                isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'
+              }`}>
+                <h2 className="text-2xl font-bold mb-2">Screener Unavailable</h2>
+                <p className={`mb-6 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  The Convex backend is not connected. Please use the Screener instead.
+                </p>
+                <button
+                  onClick={() => setCurrentPage('dashboard')}
+                  className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            </div>
+          )}
+        >
+          <Suspense fallback={
+            <div className={`h-full flex items-center justify-center ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+              <div className="flex flex-col items-center">
+                <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>Loading Screener...</p>
+              </div>
+            </div>
+          }>
+            <ScreenerPage isDark={isDark} toggleTheme={toggleTheme} />
+          </Suspense>
+        </ErrorBoundary>
+      ) : currentPage === 'dummy-screener' ? (
+        <ErrorBoundary
+          isDark={isDark}
+          message="The Dummy Screener encountered an error. Please try refreshing."
+        >
+          <DummyScreener isDark={isDark} toggleTheme={toggleTheme} />
+        </ErrorBoundary>
+      ) : currentPage === 'convex-test' ? (
+        <ErrorBoundary
+          isDark={isDark}
+          message="The Convex Test page could not be loaded."
+        >
+          <Suspense fallback={
+            <div className={`h-full flex items-center justify-center ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>Loading...</p>
+              </div>
+            </div>
+          }>
+            <ConvexTest />
+          </Suspense>
+        </ErrorBoundary>
       ) : (
         <div className="flex flex-1 overflow-hidden relative">
         {/* Main Content Area */}
@@ -485,4 +558,12 @@ const App = () => {
   );
 };
 
-export default App;
+const AppWithBoundary = () => (
+  <ErrorBoundary
+    message="The application encountered an unexpected error. Please refresh the page."
+  >
+    <App />
+  </ErrorBoundary>
+);
+
+export default AppWithBoundary;

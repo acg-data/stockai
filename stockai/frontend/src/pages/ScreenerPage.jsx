@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
   Search, Filter, ChevronDown, ChevronUp, Settings, Download,
   TrendingUp, DollarSign, BarChart3, Target, Users, Building,
-  Zap, X
+  Zap, X, Sun, Moon, MessageSquare, BarChart4, Brain,
+  PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
-import { massiveApi } from '../services/massiveApi';
+import { Pane, SplitPane } from 'react-split-pane';
+import { Transition } from '@headlessui/react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { useStockList, useScreenStocks, usePresets, useChatQuery, useExplainMetric, useGenerateSummary, useFullAnalysis } from '../services/convexApi';
 
 // Filter categories and their fields
 const FILTER_CATEGORIES = {
@@ -154,99 +158,160 @@ const PRESET_SCREENERS = {
   }
 };
 
-const ScreenerPage = () => {
-  const [activeCategory, setActiveCategory] = useState('valuation');
+
+
+const ScreenerPage = ({ isDark, toggleTheme }) => {
+  // Layout state
+  const [sidebarSize, setSidebarSize] = useState(400);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Data state
   const [activeFilters, setActiveFilters] = useState({});
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [sortColumn, setSortColumn] = useState('market_cap');
+  const [sortColumn, setSortColumn] = useState('marketCap');
   const [sortDirection, setSortDirection] = useState('desc');
-  const [isDark, setIsDark] = useState(false);
 
-  // Load results on mount
-  useEffect(() => {
-    loadInitialResults();
-  }, []);
+  // AI state
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
+  const [activeAnalysisTab, setActiveAnalysisTab] = useState('chat');
 
-  const loadInitialResults = async () => {
-    setLoading(true);
-    try {
-      const response = await massiveApi.getStocks({ page: 1, page_size: 50 });
-      setResults(response.data || []);
-    } catch (error) {
-      console.error('Error loading initial results:', error);
-      setResults([]);
-    }
-    setLoading(false);
-  };
+  // Convex hooks
+  const stockData = useStockList({
+    limit: 100,
+    sortBy: sortColumn,
+    sortOrder: sortDirection
+  });
+  const filteredStocks = useScreenStocks(activeFilters);
+  const presets = usePresets();
 
-  const applyFilters = async () => {
-    setLoading(true);
-    try {
-      // Convert frontend filter format to backend format
-      const backendFilters = {};
-      Object.entries(activeFilters).forEach(([key, value]) => {
-        if (value && typeof value === 'object') {
-          backendFilters[key] = value;
-        } else if (value) {
-          backendFilters[key] = { equals: value };
-        }
-      });
+  // AI actions
+  const chatAction = useChatQuery();
+  const explainAction = useExplainMetric();
+  const summaryAction = useGenerateSummary();
+  const analysisAction = useFullAnalysis();
 
-      const response = await massiveApi.screenStocks(backendFilters);
-      setResults(response.data || []);
-    } catch (error) {
-      console.error('Error applying filters:', error);
-      setResults([]);
-    }
-    setLoading(false);
-  };
+  // Keyboard shortcuts
+  useHotkeys('ctrl+k', (e) => {
+    e.preventDefault();
+    // Focus search input
+  });
 
-  const applyPreset = async (presetKey) => {
-    const preset = PRESET_SCREENERS[presetKey];
-    setActiveFilters(preset.filters);
-    await applyFilters();
-  };
+  useHotkeys('esc', () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  });
 
+  // Filter management
   const updateFilter = (fieldKey, value) => {
+    const processedValue = value === '' ? undefined : value;
     setActiveFilters(prev => ({
       ...prev,
-      [fieldKey]: value
+      [fieldKey]: processedValue
     }));
-  };
-
-  const removeFilter = (fieldKey) => {
-    setActiveFilters(prev => {
-      const newFilters = { ...prev };
-      delete newFilters[fieldKey];
-      return newFilters;
-    });
   };
 
   const clearAllFilters = () => {
     setActiveFilters({});
   };
 
-  const sortedResults = [...results].sort((a, b) => {
-    const aVal = a[sortColumn] || 0;
-    const bVal = b[sortColumn] || 0;
-    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-  });
+  // Stock selection
+  const selectStock = (stock) => {
+    setSelectedStock(stock);
+    setSidebarCollapsed(false);
+  };
+
+  // AI Chat
+  const sendChatMessage = async () => {
+    if (!chatMessage.trim() || !selectedStock) return;
+
+    const userMessage = chatMessage;
+    setChatMessage('');
+
+    // Add user message to chat
+    const newMessage = {
+      id: Date.now(),
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date().toISOString()
+    };
+    setChatHistory(prev => [...prev, newMessage]);
+
+    try {
+      // Call Convex chat action
+      const response = await chatAction({
+        message: userMessage,
+        sessionId: `stock-${selectedStock.symbol}`,
+        stockSymbol: selectedStock.symbol
+      });
+
+      // Add AI response to chat
+      const aiMessage = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: response.response,
+        timestamp: new Date().toISOString()
+      };
+      setChatHistory(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again.',
+        timestamp: new Date().toISOString()
+      };
+      setChatHistory(prev => [...prev, errorMessage]);
+    }
+  };
+
+  // AI Actions
+  const explainMetric = async (metric) => {
+    try {
+      const response = await explainAction(metric, selectedStock?.symbol);
+      const explanation = {
+        id: Date.now(),
+        role: 'assistant',
+        content: response,
+        timestamp: new Date().toISOString()
+      };
+      setChatHistory(prev => [...prev, explanation]);
+    } catch (error) {
+      console.error('Explain error:', error);
+    }
+  };
+
+  const getStockSummary = async () => {
+    try {
+      const response = await summaryAction(selectedStock.symbol);
+      const summary = {
+        id: Date.now(),
+        role: 'assistant',
+        content: response.summary,
+        timestamp: new Date().toISOString()
+      };
+      setChatHistory(prev => [...prev, summary]);
+    } catch (error) {
+      console.error('Summary error:', error);
+    }
+  };
+
+  // Get display data
+  const displayStocks = filteredStocks?.stocks || stockData?.stocks || [];
 
   const exportToCSV = () => {
-    if (results.length === 0) return;
+    if (displayStocks.length === 0) return;
 
     const headers = ['Symbol', 'Name', 'Price', 'Change %', 'Market Cap', 'P/E', 'AI Signal'];
     const csvContent = [
       headers.join(','),
-      ...results.map(stock => [
+      ...displayStocks.map(stock => [
         stock.symbol,
         `"${stock.name}"`,
         stock.price,
-        stock.change_percent,
-        stock.market_cap,
-        stock.pe_ratio,
-        stock.ai_signal || 'Neutral'
+        stock.changePercent || 0,
+        stock.marketCap,
+        stock.peRatio,
+        stock.aiSignal || 'Neutral'
       ].join(','))
     ].join('\n');
 
@@ -260,23 +325,30 @@ const ScreenerPage = () => {
   };
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+    <div className={`h-screen flex flex-col ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
       {/* Header */}
-      <div className={`border-b ${isDark ? 'border-slate-700 bg-slate-800/90' : 'border-slate-200 bg-white/80'} backdrop-blur-md sticky top-0 z-20`}>
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className={`border-b ${isDark ? 'border-slate-700 bg-slate-800/90' : 'border-slate-200 bg-white/80'} backdrop-blur-md z-20`}>
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Stock Screener</h1>
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                Found {results.length} stocks matching your criteria
+                Found {displayStocks.length} stocks matching your criteria
               </p>
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setIsDark(!isDark)}
+                onClick={toggleTheme}
                 className={`p-2 rounded-lg ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
               >
                 {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className={`p-2 rounded-lg ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
+                title="Toggle AI Panel (Esc)"
+              >
+                {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
               </button>
               <button
                 onClick={exportToCSV}
@@ -290,160 +362,151 @@ const ScreenerPage = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-12 gap-6">
-          {/* Filter Sidebar */}
-          <div className="col-span-3">
-            <div className={`rounded-xl border ${isDark ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'} p-6 sticky top-24`}>
-              {/* Category Tabs */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold mb-3">Filter Categories</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(FILTER_CATEGORIES).map(([key, category]) => {
-                    const Icon = category.icon;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setActiveCategory(key)}
-                        className={`flex items-center gap-2 p-2 rounded-lg text-xs font-medium transition-colors ${
-                          activeCategory === key
-                            ? 'bg-indigo-100 text-indigo-700'
-                            : isDark ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                        {category.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Active Filters */}
-              {Object.keys(activeFilters).length > 0 && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold">Active Filters</h3>
-                    <button
-                      onClick={clearAllFilters}
-                      className="text-xs text-red-600 hover:text-red-700"
-                    >
-                      Clear All
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {Object.entries(activeFilters).map(([key, value]) => (
-                      <div key={key} className={`flex items-center justify-between p-2 rounded-lg ${
-                        isDark ? 'bg-slate-700' : 'bg-slate-100'
-                      }`}>
-                        <span className="text-xs font-medium">{key.replace(/_/g, ' ')}</span>
-                        <button
-                          onClick={() => removeFilter(key)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Preset Screeners */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold mb-3">Preset Screeners</h3>
-                <div className="space-y-2">
-                  {Object.entries(PRESET_SCREENERS).map(([key, preset]) => {
-                    const Icon = preset.icon;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => applyPreset(key)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${
-                          isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Icon className="w-4 h-4 text-indigo-600" />
-                          <span className="text-sm font-medium">{preset.name}</span>
-                        </div>
-                        <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                          {preset.description}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Apply Filters Button */}
-              <button
-                onClick={applyFilters}
-                disabled={loading}
-                className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {loading ? 'Applying...' : 'Apply Filters'}
-              </button>
-            </div>
-          </div>
-
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-hidden">
+        <SplitPane
+          split="vertical"
+          defaultSize={sidebarCollapsed ? '100%' : `calc(100% - ${sidebarSize}px)`}
+          size={sidebarCollapsed ? '100%' : undefined}
+          minSize={600}
+          maxSize={sidebarCollapsed ? undefined : '90%'}
+          onChange={(size) => setSidebarSize(window.innerWidth - size)}
+          paneStyle={{ overflow: 'hidden' }}
+          resizerStyle={{
+            width: '2px',
+            background: isDark ? '#374151' : '#e5e7eb',
+            cursor: 'col-resize'
+          }}
+        >
           {/* Main Content */}
-          <div className="col-span-9">
-            {/* Filter Controls for Active Category */}
-            <div className={`rounded-xl border ${isDark ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'} p-6 mb-6`}>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                {React.createElement(FILTER_CATEGORIES[activeCategory].icon, { className: "w-5 h-5" })}
-                {FILTER_CATEGORIES[activeCategory].label} Filters
-              </h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                {Object.entries(FILTER_CATEGORIES[activeCategory].fields).map(([fieldKey, fieldConfig]) => (
-                  <div key={fieldKey} className="space-y-2">
-                    <label className="text-sm font-medium">{fieldConfig.label}</label>
-
-                    {fieldConfig.type === 'range' ? (
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          placeholder="Min"
-                          value={activeFilters[fieldKey]?.min || ''}
-                          onChange={(e) => updateFilter(fieldKey, {
-                            ...activeFilters[fieldKey],
-                            min: e.target.value ? parseFloat(e.target.value) : undefined
-                          })}
-                          className={`flex-1 px-3 py-2 text-sm rounded border ${
-                            isDark ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-white'
-                          }`}
-                        />
-                        <input
-                          type="number"
-                          placeholder="Max"
-                          value={activeFilters[fieldKey]?.max || ''}
-                          onChange={(e) => updateFilter(fieldKey, {
-                            ...activeFilters[fieldKey],
-                            max: e.target.value ? parseFloat(e.target.value) : undefined
-                          })}
-                          className={`flex-1 px-3 py-2 text-sm rounded border ${
-                            isDark ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-white'
-                          }`}
-                        />
-                      </div>
-                    ) : fieldConfig.type === 'select' ? (
-                      <select
-                        value={activeFilters[fieldKey] || ''}
-                        onChange={(e) => updateFilter(fieldKey, e.target.value || undefined)}
-                        className={`w-full px-3 py-2 text-sm rounded border ${
-                          isDark ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-white'
-                        }`}
-                      >
-                        <option value="">All</option>
-                        {fieldConfig.options?.map(option => (
-                          <option key={option} value={option}>{option}</option>
+          <div className="flex flex-col h-full">
+            {/* Inline Filter Bar */}
+            <div className={`border-b ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} p-4`}>
+              <div className="flex items-center gap-6 overflow-x-auto">
+                {Object.entries(FILTER_CATEGORIES).map(([categoryKey, category]) => {
+                  const Icon = category.icon;
+                  return (
+                    <div key={categoryKey} className="flex items-center gap-3 flex-shrink-0">
+                      <Icon className={`w-4 h-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`} />
+                      <span className="text-sm font-medium whitespace-nowrap">{category.label}:</span>
+                      <div className="flex items-center gap-2">
+                        {Object.entries(category.fields).map(([fieldKey, field]) => (
+                          <input
+                            key={fieldKey}
+                            type={field.type}
+                            placeholder={field.placeholder}
+                            value={activeFilters[fieldKey] || ''}
+                            onChange={(e) => updateFilter(fieldKey, e.target.value)}
+                            className={`w-20 px-2 py-1 text-xs rounded border ${
+                              isDark
+                                ? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400'
+                                : 'border-slate-300 bg-white'
+                            }`}
+                          />
                         ))}
-                      </select>
-                    ) : null}
-                  </div>
-                ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                <button
+                  onClick={clearAllFilters}
+                  className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 flex-shrink-0"
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+
+            {/* Screener Table */}
+            <div className="flex-1 overflow-auto">
+              <div className={`m-4 rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} overflow-hidden`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className={`border-b ${isDark ? 'border-slate-700 bg-slate-700' : 'border-slate-200 bg-slate-50'}`}>
+                      <tr>
+                        {[
+                          { key: 'symbol', label: 'Symbol', sortable: true },
+                          { key: 'name', label: 'Name', sortable: false },
+                          { key: 'price', label: 'Price', sortable: true },
+                          { key: 'changePercent', label: 'Change %', sortable: true },
+                          { key: 'marketCap', label: 'Market Cap', sortable: true },
+                          { key: 'peRatio', label: 'P/E', sortable: true },
+                          { key: 'aiSignal', label: 'AI Signal', sortable: false }
+                        ].map(col => (
+                          <th
+                            key={col.key}
+                            className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 ${
+                              isDark ? 'text-slate-300' : 'text-slate-600'
+                            } ${col.sortable ? 'select-none' : ''}`}
+                            onClick={col.sortable ? () => {
+                              if (sortColumn === col.key) {
+                                setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                              } else {
+                                setSortColumn(col.key);
+                                setSortDirection('desc');
+                              }
+                            } : undefined}
+                          >
+                            <div className="flex items-center gap-1">
+                              {col.label}
+                              {col.sortable && sortColumn === col.key && (
+                                sortDirection === 'asc' ?
+                                  <ChevronUp className="w-3 h-3" /> :
+                                  <ChevronDown className="w-3 h-3" />
+                              )}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-200'}`}>
+                      {displayStocks.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-8 text-center">
+                            <div className="text-slate-500">No stocks found. Try adjusting your filters.</div>
+                          </td>
+                        </tr>
+                      ) : (
+                        displayStocks.map(stock => (
+                          <tr
+                            key={stock.symbol || stock._id}
+                            onClick={() => selectStock(stock)}
+                            className={`hover:bg-indigo-50/30 transition-colors cursor-pointer ${
+                              isDark ? 'hover:bg-slate-700/30' : ''
+                            } ${selectedStock?.symbol === stock.symbol ? 'bg-indigo-100/20 dark:bg-indigo-900/20' : ''}`}
+                          >
+                            <td className="px-4 py-3 font-bold text-indigo-600">{stock.symbol}</td>
+                            <td className={`px-4 py-3 font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                              {stock.name}
+                            </td>
+                            <td className={`px-4 py-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                              ${stock.price?.toFixed(2)}
+                            </td>
+                            <td className={`px-4 py-3 ${stock.changePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent?.toFixed(2)}%
+                            </td>
+                            <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {stock.marketCap ? `$${(stock.marketCap / 1000000000).toFixed(1)}B` : 'N/A'}
+                            </td>
+                            <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {stock.peRatio?.toFixed(1) || 'N/A'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
+                                stock.aiSignal === 'Strong Buy' ? 'bg-green-100 text-green-800' :
+                                stock.aiSignal === 'Buy' ? 'bg-blue-100 text-blue-800' :
+                                stock.aiSignal === 'Hold' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {stock.aiSignal || 'Neutral'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -542,8 +605,183 @@ const ScreenerPage = () => {
                 </table>
               </div>
             </div>
+
+            {/* Preset Bar */}
+            <div className={`border-t ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} p-4`}>
+              <div className="flex items-center gap-4 overflow-x-auto">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-400 flex-shrink-0">Presets:</span>
+                {presets?.map(preset => {
+                  const Icon = TrendingUp; // Default icon
+                  return (
+                    <button
+                      key={preset.name}
+                      onClick={() => setActiveFilters(preset.filters)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
+                        isDark ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {preset.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* AI Sidebar */}
+          <Transition
+            show={!sidebarCollapsed}
+            enter="transition-transform duration-200"
+            enterFrom="translate-x-full"
+            enterTo="translate-x-0"
+            leave="transition-transform duration-200"
+            leaveFrom="translate-x-0"
+            leaveTo="translate-x-full"
+          >
+            <div className={`h-full border-l ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} flex flex-col`}>
+              {selectedStock ? (
+                <>
+                  {/* Stock Header */}
+                  <div className={`p-4 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-lg">{selectedStock.symbol}</h3>
+                        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{selectedStock.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">${selectedStock.price?.toFixed(2)}</div>
+                        <div className={`text-sm ${selectedStock.changePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {selectedStock.changePercent >= 0 ? '+' : ''}{selectedStock.changePercent?.toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analysis Tabs */}
+                  <div className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                    <div className="flex">
+                      {[
+                        { id: 'chat', label: 'Chat', icon: MessageSquare },
+                        { id: 'analysis', label: 'Analysis', icon: Brain },
+                        { id: 'charts', label: 'Charts', icon: BarChart4 }
+                      ].map(tab => {
+                        const Icon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => setActiveAnalysisTab(tab.id)}
+                            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                              activeAnalysisTab === tab.id
+                                ? 'border-indigo-600 text-indigo-600'
+                                : isDark ? 'border-transparent text-slate-400 hover:text-slate-200' : 'border-transparent text-slate-600 hover:text-slate-800'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4" />
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Tab Content */}
+                  <div className="flex-1 overflow-hidden">
+                    {activeAnalysisTab === 'chat' && (
+                      <div className="flex flex-col h-full">
+                        {/* Chat Messages */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                          {chatHistory.map(message => (
+                            <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-xs px-4 py-2 rounded-lg ${
+                                message.role === 'user'
+                                  ? 'bg-indigo-600 text-white'
+                                  : isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-800'
+                              }`}>
+                                <p className="text-sm">{message.content}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                          <div className="flex gap-2 mb-3">
+                            <button
+                              onClick={() => explainMetric('peRatio')}
+                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                            >
+                              Explain P/E
+                            </button>
+                            <button
+                              onClick={getStockSummary}
+                              className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                            >
+                              Summary
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Chat Input */}
+                        <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={chatMessage}
+                              onChange={(e) => setChatMessage(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+                              placeholder="Ask about this stock..."
+                              className={`flex-1 px-3 py-2 text-sm rounded border ${
+                                isDark ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-white'
+                              }`}
+                            />
+                            <button
+                              onClick={sendChatMessage}
+                              disabled={!chatMessage.trim()}
+                              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeAnalysisTab === 'analysis' && (
+                      <div className="p-4">
+                        <div className="space-y-4">
+                          <div className="text-center py-8">
+                            <Brain className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+                            <p className="text-slate-500">Analysis panel coming soon...</p>
+                            <p className="text-xs text-slate-400 mt-2">Will include fundamentals, sentiment, and technical analysis</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeAnalysisTab === 'charts' && (
+                      <div className="p-4">
+                        <div className="text-center py-8">
+                          <BarChart4 className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+                          <p className="text-slate-500">Charts panel coming soon...</p>
+                          <p className="text-xs text-slate-400 mt-2">Will include price charts and technical indicators</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <MessageSquare className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+                    <p className="text-slate-500">Select a stock to start analyzing</p>
+                    <p className="text-xs text-slate-400 mt-2">Click on any stock in the table</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Transition>
+        </SplitPane>
       </div>
     </div>
   );
