@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-const MASSIVE_API_KEY = 'EfgnZQXZdoMTNgTf6lp7PXqqmBb7xXVZ';
-const MASSIVE_BASE_URL = 'https://api.massive.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 interface MassiveStock {
   symbol: string;
@@ -57,13 +56,12 @@ export const massiveApi = {
   } = {}) => {
     try {
       const response = await axios.get<MassiveResponse>(
-        `${MASSIVE_BASE_URL}/stocks`,
+        `${API_BASE_URL}/stocks/list`,
         {
           params: {
-            api_key: MASSIVE_API_KEY,
             page,
             page_size: pageSize,
-            sector,
+            sector: sector === 'Any' ? undefined : sector,
             market_cap_min: marketCapMin,
             pe_min: peRange?.[0],
             pe_max: peRange?.[1],
@@ -78,16 +76,10 @@ export const massiveApi = {
 
   searchStocks: async (query: string) => {
     try {
-      const response = await axios.get<MassiveResponse>(
-        `${MASSIVE_BASE_URL}/stocks/search`,
-        {
-          params: {
-            api_key: MASSIVE_API_KEY,
-            q: query,
-          },
-        }
+      const response = await axios.get<{ results: MassiveStock[] }>(
+        `${API_BASE_URL}/stocks/search/${encodeURIComponent(query)}`
       );
-      return response.data;
+      return { data: response.data.results, pagination: { total: response.data.results.length } };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -95,15 +87,10 @@ export const massiveApi = {
 
   getQuote: async (symbol: string) => {
     try {
-      const response = await axios.get<{ data: MassiveStock }>(
-        `${MASSIVE_BASE_URL}/stocks/${symbol}`,
-        {
-          params: {
-            api_key: MASSIVE_API_KEY,
-          },
-        }
+      const response = await axios.get<MassiveStock>(
+        `${API_BASE_URL}/stocks/quote/${symbol.toUpperCase()}`
       );
-      return response.data.data;
+      return response.data;
     } catch (error) {
       throw handleApiError(error);
     }
