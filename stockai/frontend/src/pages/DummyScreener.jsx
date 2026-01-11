@@ -778,12 +778,14 @@ const DummyScreener = ({ isDark, toggleTheme }) => {
           </div>
 
           {/* Table - Flex grow to fill remaining space */}
-          <div className="flex-1 overflow-hidden flex flex-col">
+<div className="flex-1 overflow-hidden flex flex-col">
             <div className={`flex-1 overflow-auto p-4 ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
               <div className={`rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} overflow-hidden shadow-lg`}>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className={`border-b sticky top-0 ${isDark ? 'border-slate-700 bg-slate-700' : 'border-slate-200 bg-slate-50'}`}>
+                    <thead className={`border-b fixed top-0 left-0 right-0 z-50 ${
+                      isDark ? 'border-slate-700 bg-slate-700' : 'border-slate-200 bg-slate-50'
+                    }`} style={{ marginLeft: 'auto', marginRight: 'auto', maxWidth: 'calc(100% - 2rem)' }}>
                     <tr>
                       {[
                         { key: 'symbol', label: 'Symbol', width: 'w-24' },
@@ -813,8 +815,8 @@ const DummyScreener = ({ isDark, toggleTheme }) => {
                         </th>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-200'}`}>
+                    </thead>
+                    <tbody className={`divide-y pt-12 ${isDark ? 'divide-slate-700' : 'divide-slate-200'}`}>
                     {sortedStocks.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="px-4 py-12 text-center">
