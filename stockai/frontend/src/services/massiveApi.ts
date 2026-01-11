@@ -95,4 +95,34 @@ export const massiveApi = {
       throw handleApiError(error);
     }
   },
+
+  screenStocks: async (filters: Record<string, any>) => {
+    try {
+      const response = await axios.post<MassiveResponse>(
+        `${API_BASE_URL}/screener/query`,
+        { filters }
+      );
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  getNaturalLanguageResults: async (query: string) => {
+    try {
+      const response = await axios.post<{
+        original_query: string;
+        interpreted_filters: Record<string, any>;
+        interpretation: string;
+        results: MassiveStock[];
+        count: number;
+      }>(
+        `${API_BASE_URL}/screener/natural-language`,
+        { query }
+      );
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
 };

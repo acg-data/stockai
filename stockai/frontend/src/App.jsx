@@ -3,6 +3,7 @@ import {
   Search, Bell, User, Layout, Filter, Sparkles,
   Send, ArrowRight, ChevronDown, TrendingUp, Activity, Sun, Moon, ChevronUp
 } from 'lucide-react';
+import ScreenerPage from './pages/ScreenerPage';
 
 // --- MOCK DATA ---
 const STOCK_DATA = [
@@ -29,7 +30,7 @@ const STOCK_DATA = [
 ];
 
 // --- COMPONENT: HEADER ---
-const Header = ({ isDark, toggleTheme }) => (
+const Header = ({ isDark, toggleTheme, currentPage, setCurrentPage }) => (
   <header className={`h-16 border-b sticky top-0 z-20 flex items-center justify-between px-6 lg:px-8 transition-colors ${
     isDark
       ? 'border-slate-700 bg-slate-800/90 backdrop-blur-md'
@@ -40,8 +41,24 @@ const Header = ({ isDark, toggleTheme }) => (
         FINVIZ<span className="text-indigo-600">.</span>
       </h1>
       <nav className="hidden md:flex gap-6 text-[11px] font-bold uppercase tracking-widest">
-        {['Screener', 'Maps', 'Portfolio', 'Insider'].map((item) => (
-          <a key={item} href="#" className={`hover:text-indigo-600 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{item}</a>
+        {[
+          { name: 'Dashboard', page: 'dashboard' },
+          { name: 'Screener', page: 'screener' },
+          { name: 'Maps', page: 'maps' },
+          { name: 'Portfolio', page: 'portfolio' },
+          { name: 'Insider', page: 'insider' }
+        ].map((item) => (
+          <button
+            key={item.name}
+            onClick={() => setCurrentPage(item.page)}
+            className={`hover:text-indigo-600 transition-colors ${
+              currentPage === item.page
+                ? 'text-indigo-600'
+                : isDark ? 'text-slate-400' : 'text-slate-400'
+            }`}
+          >
+            {item.name}
+          </button>
         ))}
       </nav>
     </div>
@@ -312,6 +329,7 @@ const signalOrder = { 'Strong Buy': 4, 'Buy': 3, 'Neutral': 2, 'Hold': 1 };
 
 // --- MAIN APP COMPONENT ---
 const App = () => {
+  const [currentPage, setCurrentPage] = useState('dashboard'); // 'dashboard' or 'screener'
   const [filter, setFilter] = useState('All');
   const [sortColumn, setSortColumn] = useState('t');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -385,9 +403,17 @@ const App = () => {
     <div className={`flex flex-col h-screen font-sans overflow-hidden transition-colors ${
       isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'
     }`}>
-      <Header isDark={isDark} toggleTheme={toggleTheme} />
+      <Header
+        isDark={isDark}
+        toggleTheme={toggleTheme}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+      />
 
-      <div className="flex flex-1 overflow-hidden relative">
+      {currentPage === 'screener' ? (
+        <ScreenerPage />
+      ) : (
+        <div className="flex flex-1 overflow-hidden relative">
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Toolbar */}
@@ -454,6 +480,7 @@ const App = () => {
         {/* Right Sidebar */}
         <GeminiSidebar isDark={isDark} />
       </div>
+      )}
     </div>
   );
 };
