@@ -891,8 +891,9 @@ const DummyScreener = ({ isDark, toggleTheme }) => {
           leave="transition-transform duration-200"
           leaveFrom="translate-x-0"
           leaveTo="translate-x-full"
+          className="h-full overflow-hidden"
         >
-          <div className="flex h-full">
+          <div className="flex h-full overflow-hidden">
             {/* Drag Handle */}
             <div
               onMouseDown={handleMouseDown}
@@ -925,7 +926,7 @@ const DummyScreener = ({ isDark, toggleTheme }) => {
             {selectedStock ? (
               <>
                 {/* Stock Header */}
-                <div className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'} p-4 bg-gradient-to-r ${
+                <div className={`border-b flex-shrink-0 ${isDark ? 'border-slate-700' : 'border-slate-200'} p-4 bg-gradient-to-r ${
                   isDark ? 'from-slate-800 to-slate-700' : 'from-white to-slate-50'
                 }`}>
                   <div className="flex items-center justify-between">
@@ -973,7 +974,7 @@ const DummyScreener = ({ isDark, toggleTheme }) => {
                 </div>
 
                 {/* Analysis Tabs */}
-                <div className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <div className={`border-b flex-shrink-0 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                   <div className="flex">
                     {[
                       { id: 'chat', label: 'Chat', icon: MessageSquare },
@@ -1000,10 +1001,10 @@ const DummyScreener = ({ isDark, toggleTheme }) => {
                 </div>
 
                 {/* Tab Content */}
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                   {activeAnalysisTab === 'chat' && (
-                    <div className="flex flex-col h-full">
-                      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div className="flex flex-col flex-1 min-h-0">
+                      <div className="flex-1 overflow-y-auto p-4 space-y-4 flex-shrink-0">
                         {chatHistory.length === 0 ? (
                           <div className="text-center py-8">
                             <MessageSquare className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
@@ -1029,7 +1030,7 @@ const DummyScreener = ({ isDark, toggleTheme }) => {
                       </div>
 
                       {/* Quick Actions */}
-                      <div className={`p-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                      <div className={`p-3 border-t flex-shrink-0 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                         <div className="flex gap-2">
                           <button
                             onClick={() => getQuickActionResponse('pe')}
@@ -1053,7 +1054,7 @@ const DummyScreener = ({ isDark, toggleTheme }) => {
                       </div>
 
                       {/* Chat Input */}
-                      <div className={`p-4 border-t ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
+                      <div className={`p-4 border-t flex-shrink-0 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
                         <div className="flex gap-2">
                           <input
                             type="text"
