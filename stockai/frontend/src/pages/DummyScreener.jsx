@@ -185,7 +185,49 @@ const FILTER_FIELDS_BY_CATEGORY = {
     { label: 'Yield', key: 'etfYield' },
     { label: 'AUM', key: 'aum' }
   ],
-  All: []
+  All: [
+    { label: 'Exchange', key: 'exchange' },
+    { label: 'Index', key: 'index' },
+    { label: 'Sector', key: 'sector' },
+    { label: 'Industry', key: 'industry' },
+    { label: 'Country', key: 'country' },
+    { label: 'Market Cap.', key: 'marketCap' },
+    { label: 'Dividend Yield', key: 'dividendYield' },
+    { label: 'Short Float', key: 'shortFloat' },
+    { label: 'Analyst Recom.', key: 'analystRecom' },
+    { label: 'Option/Short', key: 'optionShort' },
+    { label: 'Earnings Date', key: 'earningsDate' },
+    { label: 'Average Volume', key: 'avgVolume' },
+    { label: 'Shares Outstanding', key: 'sharesOutstanding' },
+    { label: 'Float', key: 'float' },
+    { label: 'P/E Ratio', key: 'peRatio' },
+    { label: 'PEG Ratio', key: 'pegRatio' },
+    { label: 'Price/Book', key: 'priceToBook' },
+    { label: 'Debt/Equity', key: 'debtToEquity' },
+    { label: 'ROE', key: 'returnOnEquity' },
+    { label: 'Revenue Growth', key: 'revenueGrowth' },
+    { label: 'Earnings Growth', key: 'earningsGrowth' },
+    { label: 'Relative Volume', key: 'relVolume' },
+    { label: 'Current Volume', key: 'currentVolume' },
+    { label: 'RSI (14)', key: 'rsi14' },
+    { label: 'Price $', key: 'price' },
+    { label: '52-Week High', key: 'week52High' },
+    { label: '52-Week Low', key: 'week52Low' },
+    { label: 'Beta', key: 'beta' },
+    { label: 'Volatility', key: 'volatility' },
+    { label: 'Moving Avg 50', key: 'ma50' },
+    { label: 'Moving Avg 200', key: 'ma200' },
+    { label: 'News Sentiment', key: 'newsSentiment' },
+    { label: 'Recent Headlines', key: 'recentHeadlines' },
+    { label: 'Analyst Updates', key: 'analystUpdates' },
+    { label: 'Surprise Events', key: 'surpriseEvents' },
+    { label: 'Social Media Buzz', key: 'socialBuzz' },
+    { label: 'ETF Holdings', key: 'etfHoldings' },
+    { label: 'ETF Category', key: 'etfCategory' },
+    { label: 'Expense Ratio', key: 'expenseRatio' },
+    { label: 'Yield', key: 'etfYield' },
+    { label: 'AUM', key: 'aum' }
+  ]
 };
 
 // Filter tabs
@@ -713,7 +755,6 @@ const DummyScreener = ({ isDark, toggleTheme }) => {
                       </div>
                     </div>
                   ))}
-                  {activeFilterTab === 'All' && <div className="col-span-full text-center py-4 text-sm text-gray-500">Select a category above to view filters</div>}
                 </div>
               </div>
             </div>
